@@ -105,13 +105,13 @@ def run_demonstration(fs, crossover_hz, target_slope, stopband_db, min_taps, max
 
 if __name__ == "__main__":
     FS = 44100
-    CROSSOVER = 10000
+    CROSSOVER = 1000
 
     # 1. 12 dB/oct
-    run_demonstration(FS, CROSSOVER, 12, 60, 17, 31, "qmf_12")
+    run_demonstration(FS, CROSSOVER, 12, 50, 61, 127, "qmf_12")
 
     # 2. 24 dB/oct
-    run_demonstration(FS, CROSSOVER, 24, 60, 33, 63, "qmf_24")
+    run_demonstration(FS, CROSSOVER, 24, 60, 129, 255, "qmf_24")
 
     # 3. 48 dB/oct with restricted tap search
-    run_demonstration(FS, CROSSOVER, 48, 60, 17, 31, "qmf_48_limited")
+    run_demonstration(FS, CROSSOVER, 48, 60, 61, 127, "qmf_48_limited")
