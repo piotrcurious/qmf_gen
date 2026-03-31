@@ -5,6 +5,7 @@ This project provides a tool for designing 2-channel analysis Quadrature Mirror 
 ## Features
 
 - **Optimal Filter Design**: Uses the Remez exchange algorithm to design symmetric FIR filters.
+- **Perfectly Complementary Channels**: High-pass filter is designed as a complementary pair ($H_1(z) = z^{-mid} - H_0(z)$), ensuring magnitude and phase integrity at the crossover.
 - **ESP32 Optimized**: Generates C++ code that exploits linear-phase symmetry and uses IRAM (on ESP32) for fast execution.
 - **Flexible Parameters**: Custom sample rates, crossover frequencies, target slopes, and stopband attenuation.
 - **Python Mock System**: Test the generated filters in Python before deploying to hardware.
@@ -15,7 +16,7 @@ This project provides a tool for designing 2-channel analysis Quadrature Mirror 
 ### 1. Generate a Filter
 
 ```bash
-python3 esp32_qmf_gen4.py --fs 44100 --crossover-hz 10000 --target-slope-db-per-oct 24 --stopband-db 60 --max-taps 63 --output qmf_24.h
+python3 esp32_qmf_gen4.py --fs 44100 --crossover-hz 1000 --target-slope-db-per-oct 24 --stopband-db 60 --max-taps 255 --output qmf_24.h
 ```
 
 ### 2. Test in Python
@@ -25,11 +26,13 @@ Use the `MockQMF2` class in `mock_qmf.py` to simulate the filter:
 ```python
 from mock_qmf import MockQMF2
 import numpy as np
+import json
 
-# Load taps from generated .h or .json
-taps = 33
-h0 = [...]
-qmf = MockQMF2(taps, h0)
+# Load metadata
+with open('qmf_24.json', 'r') as f:
+    meta = json.load(f)
+
+qmf = MockQMF2(meta['taps'], meta['h0'], meta['h1'])
 
 # Process a sample
 low, high = qmf.process(0.5)
@@ -37,27 +40,27 @@ low, high = qmf.process(0.5)
 
 ## Demonstrations
 
-We have demonstrated three different filter configurations to show the principles behind the system. All tests were performed at a sample rate of 44.1 kHz and a crossover frequency of 10 kHz.
+We have demonstrated three different filter configurations at a lower crossover frequency (1000 Hz) to show the principles behind the system. All tests were performed at a sample rate of 44.1 kHz.
 
-### 1. 12 dB/oct Filter (31 Max Taps)
+### 1. 12 dB/oct Filter (127 Max Taps)
 
-This filter is designed for a gentle slope. With a limit of 31 taps, it easily meets its goals.
+At a 1000 Hz crossover, this 61-tap filter achieves the target slope with good stopband attenuation. Both low-pass and high-pass channels are correctly centered at the crossover.
 
 ![Theoretical Response 12dB](qmf_12_response.png)
 ![Spectrogram Low 12dB](qmf_12_spec_low.png)
 ![Spectrogram High 12dB](qmf_12_spec_high.png)
 
-### 2. 24 dB/oct Filter (63 Max Taps)
+### 2. 24 dB/oct Filter (255 Max Taps)
 
-A steeper slope requires more taps. By increasing the maximum tap search to 63, the generator found an optimal 33-tap filter that achieves a much sharper transition.
+By increasing the tap search range up to 255, the generator found a 155-tap filter that provides a sharper transition at 1000 Hz.
 
 ![Theoretical Response 24dB](qmf_24_response.png)
 ![Spectrogram Low 24dB](qmf_24_spec_low.png)
 ![Spectrogram High 24dB](qmf_24_spec_high.png)
 
-### 3. 48 dB/oct Filter with Half Tap Search (31 Max Taps)
+### 3. 48 dB/oct Filter with Half Tap Search (127 Max Taps)
 
-This demonstration shows the principles of the system: attempting to achieve a very steep 48 dB/oct slope with only 31 taps. Since the tap count is insufficient for such a sharp transition, the generator finds the best possible compromise within the constraints. Note how it compares to the 12 dB/oct filter when given the same tap limit.
+This demonstration shows the principles of the system: attempting to achieve a very steep 48 dB/oct slope with restricted taps (127 max). The 115-tap filter found by the generator is a compromise between the steep target and the available tap count.
 
 ![Theoretical Response 48dB Limited](qmf_48_limited_response.png)
 ![Spectrogram Low 48dB Limited](qmf_48_limited_spec_low.png)

@@ -1,9 +1,10 @@
 import numpy as np
 
 class MockQMF2:
-    def __init__(self, taps, h0):
+    def __init__(self, taps, h0, h1):
         self.taps = taps
         self.h0 = np.array(h0)
+        self.h1 = np.array(h1)
         self.mid = taps // 2
         self.half = taps // 2
         self.reset()
@@ -21,7 +22,8 @@ class MockQMF2:
         if not self.phase:
             return None # Equivalent to returning false in C++
 
-        h = self.h0
+        h0 = self.h0
+        h1 = self.h1
         y0 = 0.0
         y1 = 0.0
 
@@ -31,22 +33,15 @@ class MockQMF2:
 
         for k in range(self.half):
             s = self.delay[left] + self.delay[right]
-            c = h[k]
-
-            mod = -c if (k & 1) else c
-
-            y0 += c * s
-            y1 += mod * s
+            y0 += h0[k] * s
+            y1 += h1[k] * s
 
             left = (self.taps - 1) if (left == 0) else (left - 1)
             right = 0 if (right + 1 == self.taps) else (right + 1)
 
         # Center tap.
         center = self.delay[left]
-        cMid = h[self.mid]
-        modMid = -cMid if (self.mid & 1) else cMid
-
-        y0 += cMid * center
-        y1 += modMid * center
+        y0 += h0[self.mid] * center
+        y1 += h1[self.mid] * center
 
         return y0, y1

@@ -102,8 +102,16 @@ def _design_with_weight(
 
 
 def qmf_highpass_from_lowpass(h0: np.ndarray) -> np.ndarray:
-    n = np.arange(h0.size, dtype=np.int64)
-    return h0 * ((-1.0) ** n)
+    """Create a complementary high-pass filter from the low-pass prototype.
+
+    For an odd-length linear-phase FIR h0, the complementary high-pass h1
+    is h1[n] = delta[n - mid] - h0[n]. This ensures h0 + h1 = delta[n - mid],
+    providing perfect reconstruction (magnitude and phase) at the crossover.
+    """
+    h1 = -h0.copy()
+    mid = h0.size // 2
+    h1[mid] += 1.0
+    return h1
 
 
 def estimate_local_slope_db_per_oct(h: np.ndarray, fs: float, crossover_hz: float) -> float:
@@ -309,6 +317,7 @@ def _format_float_array(values: Iterable[float], per_line: int = 8, precision: i
 def generate_arduino_cpp(result: QMFDesignResult, class_name: str = "QMF2") -> str:
     taps = result.taps
     h0_txt = _format_float_array(result.h0.astype(np.float32))
+    h1_txt = _format_float_array(result.h1.astype(np.float32))
 
     return f'''// Auto-generated QMF analysis filter for ESP32 / Arduino 
 
@@ -388,7 +397,8 @@ public:
             return false;
         }}
 
-        const float* h = lowpassCoeffs();
+        const float* h0 = lowpassCoeffs();
+        const float* h1 = highpassCoeffs();
         float y0 = 0.0f;
         float y1 = 0.0f;
 
@@ -398,13 +408,9 @@ public:
 
         for (int k = 0; k < HALF; ++k) {{
             const float s = delay_[left] + delay_[right];
-            const float c = h[k];
             
-            // h1[k] = h0[k] * (-1)^k. Since TAPS is odd, the highpass is also symmetric.
-            const float mod = (k & 1) ? -c : c;
-            
-            y0 += c * s;
-            y1 += mod * s;
+            y0 += h0[k] * s;
+            y1 += h1[k] * s;
 
             left = (left == 0) ? (TAPS - 1) : (left - 1);
             right = (right + 1 == TAPS) ? 0 : (right + 1);
@@ -412,24 +418,28 @@ public:
 
         // Center tap.
         const float center = delay_[left];
-        const float cMid = h[MID];
-        const float modMid = (MID & 1) ? -cMid : cMid;
-        
-        y0 += cMid * center;
-        y1 += modMid * center;
+        y0 += h0[MID] * center;
+        y1 += h1[MID] * center;
 
         low = y0;
         high = y1;
         return true;
     }}
 
-    // Keeps the static array initialized inside the function scope to avoid ODR violations
+    // Keeps the static arrays initialized inside the function scope to avoid ODR violations
     // in Arduino environments when included in multiple translation units.
     static const float* lowpassCoeffs() {{
         static const float H0[TAPS] = {{
             {h0_txt}
         }};
         return H0;
+    }}
+
+    static const float* highpassCoeffs() {{
+        static const float H1[TAPS] = {{
+            {h1_txt}
+        }};
+        return H1;
     }}
 
 private:
