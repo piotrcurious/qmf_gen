@@ -23,16 +23,13 @@ class QMFAnalyzer:
                 outputs_high.append(high)
         return np.array(outputs_low), np.array(outputs_high)
 
-    def plot_theoretical_response(self, h0, taps, target_slope, filename):
-        w, h = signal.freqz(h0, worN=8192, fs=self.fs)
-
-        # Highpass is h0[n] * (-1)^n
-        h1 = h0 * ((-1.0) ** np.arange(len(h0)))
-        w1, hh1 = signal.freqz(h1, worN=8192, fs=self.fs)
+    def plot_theoretical_response(self, h0, h1, taps, target_slope, filename):
+        w, hh0 = signal.freqz(h0, worN=8192, fs=self.fs)
+        w, hh1 = signal.freqz(h1, worN=8192, fs=self.fs)
 
         plt.figure(figsize=(10, 6))
-        plt.plot(w, 20 * np.log10(np.abs(h)), label='Low-pass (H0)')
-        plt.plot(w1, 20 * np.log10(np.abs(hh1)), label='High-pass (H1)')
+        plt.plot(w, 20 * np.log10(np.abs(hh0) + 1e-12), label='Low-pass (H0)')
+        plt.plot(w, 20 * np.log10(np.abs(hh1) + 1e-12), label='High-pass (H1)')
 
         plt.title(f"Theoretical Frequency Response ({target_slope} dB/oct, {taps} taps)")
         plt.xlabel('Frequency [Hz]')
@@ -81,19 +78,20 @@ def run_demonstration(fs, crossover_hz, target_slope, stopband_db, min_taps, max
         meta = json.load(f)
 
     h0 = np.array(meta['h0'])
+    h1 = np.array(meta['h1'])
     taps = meta['taps']
 
     analyzer = QMFAnalyzer(fs)
 
     # Plot theoretical response
-    analyzer.plot_theoretical_response(h0, taps, target_slope, f"{name}_response.png")
+    analyzer.plot_theoretical_response(h0, h1, taps, target_slope, f"{name}_response.png")
 
     # Generate test signal: Sine sweep
     sweep_duration = 2.0
     t_sweep, sweep = analyzer.generate_sine_sweep(sweep_duration, 20, fs/2)
 
     # Analyze with Mock system
-    mock_qmf = MockQMF2(taps, h0)
+    mock_qmf = MockQMF2(taps, h0, h1)
     low, high = analyzer.analyze_filter(mock_qmf, sweep)
 
     # Plotting spectrograms

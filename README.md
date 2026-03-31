@@ -5,6 +5,7 @@ This project provides a tool for designing 2-channel analysis Quadrature Mirror 
 ## Features
 
 - **Optimal Filter Design**: Uses the Remez exchange algorithm to design symmetric FIR filters.
+- **Perfectly Complementary Channels**: High-pass filter is designed as a complementary pair ($H_1(z) = z^{-mid} - H_0(z)$), ensuring magnitude and phase integrity at the crossover.
 - **ESP32 Optimized**: Generates C++ code that exploits linear-phase symmetry and uses IRAM (on ESP32) for fast execution.
 - **Flexible Parameters**: Custom sample rates, crossover frequencies, target slopes, and stopband attenuation.
 - **Python Mock System**: Test the generated filters in Python before deploying to hardware.
@@ -25,11 +26,13 @@ Use the `MockQMF2` class in `mock_qmf.py` to simulate the filter:
 ```python
 from mock_qmf import MockQMF2
 import numpy as np
+import json
 
-# Load taps from generated .h or .json
-taps = 155
-h0 = [...]
-qmf = MockQMF2(taps, h0)
+# Load metadata
+with open('qmf_24.json', 'r') as f:
+    meta = json.load(f)
+
+qmf = MockQMF2(meta['taps'], meta['h0'], meta['h1'])
 
 # Process a sample
 low, high = qmf.process(0.5)
@@ -41,7 +44,7 @@ We have demonstrated three different filter configurations at a lower crossover 
 
 ### 1. 12 dB/oct Filter (127 Max Taps)
 
-At a 1000 Hz crossover, more taps are required compared to a 10 kHz crossover. This 61-tap filter achieves the target slope with good stopband attenuation.
+At a 1000 Hz crossover, this 61-tap filter achieves the target slope with good stopband attenuation. Both low-pass and high-pass channels are correctly centered at the crossover.
 
 ![Theoretical Response 12dB](qmf_12_response.png)
 ![Spectrogram Low 12dB](qmf_12_spec_low.png)
@@ -57,7 +60,7 @@ By increasing the tap search range up to 255, the generator found a 155-tap filt
 
 ### 3. 48 dB/oct Filter with Half Tap Search (127 Max Taps)
 
-This demonstration shows the principles of the system at a lower crossover: attempting to achieve a very steep 48 dB/oct slope with restricted taps (127 max). Since 1000 Hz is quite low relative to 44.1 kHz, the generator uses more taps (115 in this case) compared to higher crossovers, but still struggles to match the extremely sharp 48 dB/oct target within these constraints.
+This demonstration shows the principles of the system: attempting to achieve a very steep 48 dB/oct slope with restricted taps (127 max). The 115-tap filter found by the generator is a compromise between the steep target and the available tap count.
 
 ![Theoretical Response 48dB Limited](qmf_48_limited_response.png)
 ![Spectrogram Low 48dB Limited](qmf_48_limited_spec_low.png)
