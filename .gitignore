@@ -1,0 +1,13 @@
+# Binaries
+build/
+test_mock
+test_basic_filter
+test_dma_filter
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS
+.DS_Store
