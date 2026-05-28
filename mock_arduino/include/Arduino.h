@@ -51,4 +51,20 @@ extern MockSerial Serial;
 #define HALF_PI 1.5707963267948966192313216916398
 #define TWO_PI 6.283185307179586476925286766559
 
+// ADC Continuous Mode (Arduino Core 3.0+)
+typedef struct {
+    uint8_t pin;
+    uint8_t channel;
+    int avg_read_raw;
+    int avg_read_mvolts;
+} adc_continuous_result_t;
+
+bool analogContinuous(const uint8_t pins[], size_t pins_count, uint32_t conversions_per_pin, uint32_t sampling_freq_hz, void (*userFunc)(void));
+bool analogContinuousRead(adc_continuous_result_t ** buffer, uint32_t timeout_ms);
+bool analogContinuousStart();
+bool analogContinuousStop();
+bool analogContinuousDeinit();
+void analogContinuousSetAtten(uint8_t attenuation);
+void analogContinuousSetWidth(uint8_t bits);
+
 #include "Arduino_extra.h"

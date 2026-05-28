@@ -2,6 +2,7 @@
 #include "driver/i2s.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
+#include "esp_adc/adc_continuous.h"
 #include <chrono>
 #include <thread>
 #include <cstdarg>
@@ -61,4 +62,52 @@ esp_adc_cal_characteristics_t* esp_adc_cal_characterize(adc_unit_t adc_num, adc_
 }
 uint32_t esp_adc_cal_raw_to_voltage(uint32_t adc_reading, const esp_adc_cal_characteristics_t *chars) {
     return (adc_reading * chars->vref) / 4095;
+}
+
+static adc_continuous_result_t mock_adc_results[16];
+static adc_continuous_result_t* mock_adc_ptr = mock_adc_results;
+
+bool analogContinuous(const uint8_t pins[], size_t pins_count, uint32_t conversions_per_pin, uint32_t sampling_freq_hz, void (*userFunc)(void)) {
+    for(size_t i=0; i<pins_count && i<16; i++) {
+        mock_adc_results[i].pin = pins[i];
+        mock_adc_results[i].avg_read_raw = 2048; // mid-scale
+    }
+    return true;
+}
+bool analogContinuousRead(adc_continuous_result_t ** buffer, uint32_t timeout_ms) {
+    *buffer = mock_adc_results;
+    return true;
+}
+bool analogContinuousStart() { return true; }
+bool analogContinuousStop() { return true; }
+bool analogContinuousDeinit() { return true; }
+void analogContinuousSetAtten(uint8_t attenuation) {}
+void analogContinuousSetWidth(uint8_t bits) {}
+
+esp_err_t adc_continuous_new_handle(const adc_continuous_handle_cfg_t *hdl_config, adc_continuous_handle_t *ret_handle) {
+    *ret_handle = (void*)0x1234;
+    return ESP_OK;
+}
+esp_err_t adc_continuous_config(adc_continuous_handle_t handle, const adc_continuous_config_t *config) {
+    return ESP_OK;
+}
+esp_err_t adc_continuous_start(adc_continuous_handle_t handle) {
+    return ESP_OK;
+}
+esp_err_t adc_continuous_read(adc_continuous_handle_t handle, uint8_t *buf, uint32_t length_max, uint32_t *out_length, uint32_t timeout_ms) {
+    *out_length = sizeof(adc_digi_output_data_t) * 4; // Mock 4 samples
+    if (*out_length > length_max) *out_length = length_max;
+
+    adc_digi_output_data_t *p = (adc_digi_output_data_t*)buf;
+    for(size_t i=0; i < (*out_length / sizeof(adc_digi_output_data_t)); i++) {
+        p[i].type1.data = 2048;
+        p[i].type1.channel = 0;
+    }
+    return ESP_OK;
+}
+esp_err_t adc_continuous_stop(adc_continuous_handle_t handle) {
+    return ESP_OK;
+}
+esp_err_t adc_continuous_deinit(adc_continuous_handle_t handle) {
+    return ESP_OK;
 }
