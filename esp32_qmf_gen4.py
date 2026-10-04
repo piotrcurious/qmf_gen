@@ -30,6 +30,11 @@ from typing import Iterable, Optional, Tuple
 import numpy as np
 from scipy import signal
 
+# Fallback for SciPy >= 1.14.0 where 'remez' was removed in favor of 'parks_mcclellan'
+_remez = getattr(signal, "parks_mcclellan", getattr(signal, "remez", None))
+if _remez is None:
+    raise ImportError("Could not find parks_mcclellan or remez in scipy.signal")
+
 
 @dataclasses.dataclass
 class QMFDesignResult:
@@ -83,7 +88,7 @@ def _design_with_weight(
     fs: float, crossover_hz: float, taps: int, transition_hz: float, stopband_weight: float
 ) -> np.ndarray:
     _, pb, sb, nyq = _band_edges(fs, crossover_hz, transition_hz)
-    h = signal.remez(
+    h = _remez(
         taps,
         [0.0, pb, sb, nyq],
         [1.0, 0.0],
@@ -92,9 +97,9 @@ def _design_with_weight(
         maxiter=200,
     )
     
-    # Catch remez convergence failure
+    # Catch convergence failure
     if np.isnan(h).any():
-        raise ValueError("remez failed to converge")
+        raise ValueError("remez/parks_mcclellan failed to converge")
         
     # Normalize DC gain to unity.
     h = h / np.sum(h)
@@ -307,7 +312,12 @@ def search_best_design(
 def _format_float_array(values: Iterable[float], per_line: int = 8, precision: int = 10) -> str:
     items = []
     for v in values:
-        items.append(f"{float(v):.{precision}g}f")
+        s = f"{float(v):.{precision}g}"
+        # Ensure it is parsed as a float literal in C++ (prevent invalid "0f" syntax)
+        if "." not in s and "e" not in s.lower():
+            s += ".0"
+        items.append(f"{s}f")
+
     lines = []
     for i in range(0, len(items), per_line):
         lines.append(", ".join(items[i : i + per_line]))
